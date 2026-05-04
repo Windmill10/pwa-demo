@@ -31,7 +31,8 @@ function useInstallPrompt() {
 }
 
 function useNotifications() {
-  const [permission, setPermission] = useState(Notification.permission)
+  const supportsNotification = typeof Notification !== 'undefined'
+  const [permission, setPermission] = useState(supportsNotification ? Notification.permission : 'unsupported')
   const [pushSub, setPushSub] = useState(null)
   const [log, setLog] = useState([])
 
@@ -40,15 +41,19 @@ function useNotifications() {
   }, [])
 
   const requestPermission = useCallback(async () => {
+    if (!supportsNotification) {
+      addLog('Notifications not supported on this device/browser')
+      return 'unsupported'
+    }
     const p = await Notification.requestPermission()
     setPermission(p)
     addLog(`Notification permission: ${p}`)
     return p
-  }, [addLog])
+  }, [addLog, supportsNotification])
 
   const sendLocal = useCallback(() => {
-    if (permission !== 'granted') {
-      addLog('Cannot notify: permission denied')
+    if (!supportsNotification || permission !== 'granted') {
+      addLog('Cannot notify: permission denied or unsupported')
       return
     }
     const n = new Notification('Local Notification', {
@@ -59,11 +64,15 @@ function useNotifications() {
     })
     addLog('Sent local notification')
     setTimeout(() => n.close(), 5000)
-  }, [permission, addLog])
+  }, [permission, addLog, supportsNotification])
 
   const subscribePush = useCallback(async () => {
     if (!('serviceWorker' in navigator)) {
       addLog('Push not supported: no Service Worker support')
+      return null
+    }
+    if (!supportsNotification) {
+      addLog('Push not supported: notifications unavailable')
       return null
     }
     const reg = await navigator.serviceWorker.ready
@@ -84,7 +93,7 @@ function useNotifications() {
     }
     setPushSub(sub)
     return sub
-  }, [addLog])
+  }, [addLog, supportsNotification])
 
   const unsubscribePush = useCallback(async () => {
     const reg = await navigator.serviceWorker.ready
@@ -126,7 +135,10 @@ export default function App() {
     }
   }, [])
 
-  const permissionLabel = permission === 'granted' ? 'Granted' : permission === 'denied' ? 'Denied' : 'Default'
+  const permissionLabel =
+    permission === 'granted' ? 'Granted' :
+    permission === 'denied' ? 'Denied' :
+    permission === 'unsupported' ? 'Unsupported' : 'Default'
 
   return (
     <>
@@ -162,15 +174,18 @@ export default function App() {
         <h2>Notifications</h2>
         <div className="row">
           <span>Permission</span>
-          <span className={permission === 'granted' ? 'status on' : 'status off'}>
+          <span className={permission === 'granted' ? 'status on' : permission === 'unsupported' ? 'status off' : 'status off'}>
             <span className="dot" />
             {permissionLabel}
           </span>
         </div>
 
         <div className="gap-2">
-          {permission !== 'granted' && (
+          {permission !== 'granted' && permission !== 'unsupported' && (
             <button onClick={requestPermission}>Request Notification Permission</button>
+          )}
+          {permission === 'unsupported' && (
+            <button disabled>Notifications Unsupported</button>
           )}
           <button onClick={sendLocal} disabled={permission !== 'granted'}>
             Send Local Notification
