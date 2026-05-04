@@ -91,7 +91,7 @@ function useNotifications() {
     const reg = await navigator.serviceWorker.ready
     let sub = await reg.pushManager.getSubscription()
     if (!sub) {
-      const vapidPublicKey = 'BOcTu-6OgRFXaW0Y7rUHVrRODT0qMPjKbKCs8tUAn6z8OvTfk9PCs4HSIR1ITKZSN6nNfRrtNtxksH8Gq7T1bFA'
+      const vapidPublicKey = 'BIo9TLcro0pWXGREXvCjx7yIn8Eq2HozdeyjZT9n397zq3upDRcPPun-yvdTO2yXMsFL-g3uvcc4gL5-J0GvRaw'
       const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey)
       try {
         sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })
