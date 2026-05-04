@@ -17,40 +17,20 @@ ${err?.stack || ''}
   }
 }
 
-// Force service worker update and activate
+// Unregister any stale service workers from previous deployments,
+// then register the fresh one. This breaks the cycle where an old SW
+// serves a cached index.html that references deleted asset files.
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/pwa-demo/sw.js')
-    .then((reg) => {
-      console.log('SW registered:', reg.scope)
-      // Check for updates immediately
-      reg.update()
-      // If an updated SW is waiting, skip waiting to activate it
-      if (reg.waiting) {
-        reg.waiting.postMessage({ type: 'SKIP_WAITING' })
-      }
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing
-        if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New SW is ready, tell it to skip waiting
-              newWorker.postMessage({ type: 'SKIP_WAITING' })
-            }
-          })
-        }
-      })
-    })
-    .catch((err) => {
-      console.error('SW registration failed:', err)
-      // Don't let SW failure block the app
-    })
-
-  // When a new SW takes over, reload to ensure fresh assets
-  let refreshing = false
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return
-    refreshing = true
-    window.location.reload()
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    return Promise.all(registrations.map((reg) => reg.unregister()))
+  }).then(() => {
+    return navigator.serviceWorker.register('/pwa-demo/sw.js')
+  }).then((reg) => {
+    console.log('SW registered:', reg.scope)
+    // Force update check
+    reg.update()
+  }).catch((err) => {
+    console.error('SW registration failed:', err)
   })
 }
 

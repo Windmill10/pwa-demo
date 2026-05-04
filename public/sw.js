@@ -1,15 +1,10 @@
-const CACHE_NAME = 'pwa-demo-v1'
-const STATIC_ASSETS = [
-  '/pwa-demo/',
-  '/pwa-demo/index.html',
-  '/pwa-demo/manifest.json'
-]
+const CACHE_NAME = 'pwa-demo-v2'
 
 self.addEventListener('install', (event) => {
+  // Don't pre-cache HTML -- always fetch it from network
+  // Only pre-cache truly static assets that never change
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS)
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(() => self.skipWaiting())
   )
 })
 
@@ -20,6 +15,7 @@ self.addEventListener('message', (event) => {
 })
 
 self.addEventListener('activate', (event) => {
+  // Delete ALL old caches to break stale data from previous deploys
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
@@ -30,10 +26,61 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url)
+
+  // Navigation requests (HTML pages): network-first
+  // This is the critical fix -- always fetch the latest HTML from the server
+  // so stale service workers don't serve outdated index.html referencing
+  // deleted asset files
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Cache the fresh response for offline fallback
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+          return response
+        })
+        .catch(() => {
+          // Network failed -- fall back to cache (offline mode)
+          return caches.match(event.request).then((cached) => {
+            return cached || caches.match('/pwa-demo/index.html')
+          })
+        })
+    )
+    return
+  }
+
+  // Static assets (JS, CSS, images): cache-first
+  // These have content hashes in filenames so they're immutable
+  if (url.pathname.match(/\.(js|css|png|jpg|svg|ico|json|woff2?)$/)) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached
+        return fetch(event.request).then((response) => {
+          // Only cache successful responses
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+          }
+          return response
+        })
+      })
+    )
+    return
+  }
+
+  // Everything else: network-first
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request)
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+        }
+        return response
+      })
+      .catch(() => caches.match(event.request))
   )
 })
 
