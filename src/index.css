@@ -151,3 +151,12 @@ pre {
   color: var(--fg);
   font-weight: 600;
 }
+
+ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+ol li {
+  margin-bottom: 4px;
+}
