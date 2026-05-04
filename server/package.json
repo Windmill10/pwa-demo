@@ -1,0 +1,13 @@
+{
+  "name": "pwa-demo-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node push-server.js",
+    "generate-vapid": "node -e \"require('web-push').generateVAPIDKeys(); console.log('Run: npx web-push generate-vapid-keys');\""
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "web-push": "^3.6.7"
+  }
+}
